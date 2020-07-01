@@ -2,10 +2,10 @@
 This is an unoffical implementation of [MaskFlownet: Asymmetric Feature Matching with Learnable Occlusion Mask](https://github.com/microsoft/MaskFlownet) by using Pytorch.
 
 ## Introduction
-![mask_visualization](./images/306.png)
+![mask_visualization](./306.png)
 
 ## Requirements
-- Pytorch 1.5.0(only for using DeformConv)
+- Pytorch 1.5.0(only for using **DeformConv**)
 - CUDA 10.1+
 - Tensorboard
 ## Install
