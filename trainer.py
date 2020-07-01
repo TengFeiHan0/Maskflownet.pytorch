@@ -15,6 +15,7 @@ import datasets
 
 from datasets import KITTIDataset, DENSODataset
 import pdb
+from tqdm import tqdm
 
 class Trainer(object):
 
@@ -137,7 +138,8 @@ class Trainer(object):
         self.model.switch_to('train')
 
         end = time.time()
-        for i, inputs in enumerate(self.train_loader):
+        
+        for i, inputs in tqdm(enumerate(self.train_loader), total=len(self.train_loader), leave=False):
             self.curr_step = self.start_iter + i
             self.lr_scheduler.step(self.curr_step)
             curr_lr = self.lr_scheduler.get_lr()[0]
@@ -172,7 +174,7 @@ class Trainer(object):
                 self.logger.info(
                     'Iter: [{0}/{1}]\t'.format(self.curr_step,
                                                len(self.train_loader)) +
-                    'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'.format(
+                    'Batch time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'.format(
                         batch_time=btime_rec) +
                     'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'.format(
                         data_time=dtime_rec) + loss_str +
@@ -237,3 +239,4 @@ class Trainer(object):
                     data_time=dtime_rec) + loss_str)
 
         self.model.switch_to('train')
+

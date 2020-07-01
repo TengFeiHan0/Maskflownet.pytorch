@@ -31,9 +31,11 @@ class MaskFlowNetModel(object):
         self.multiscale_epe = MultiscaleEpe(
 			scales = self.strides, weights = multiscale_weights, match = 'upsampling',
 			eps = 1e-8, q= 0.4)
-        self.epeloss = EpeLossWithMask(eps=1e-8, q=0.4)
+        self.epeloss = EpeLossWithMask(eps=1e-8, q=0.4)         
            
-    def set_input(self, image0, image1, label, mask):
+    def set_input(self, image0, image1, label, mask=None):
+        if isinstance(mask, list):
+            mask = torch.ones((label.shape[0], label.shape[1], label.shape[2], 1), dtype=label.dtype, device=label.device)
         self.image0 = image0.cuda().permute(0,3, 1, 2)
         self.image1 = image1.cuda().permute(0,3, 1, 2)
         self.label = label.cuda().permute(0, 3, 1, 2)
@@ -59,17 +61,21 @@ class MaskFlowNetModel(object):
             im0 = F.interpolate(im0, size=[shape[2] + pad_h, shape[3] + pad_w], mode='bilinear')
             im1 = F.interpolate(im1, size=[shape[2] + pad_h, shape[3] + pad_w], mode='bilinear')
          
-    def criterion(self, pred, label, mask):
-        loss = self.multiscale_epe(label, mask, pred)
+    def criterion(self,label, mask, predictions):
+        loss = self.multiscale_epe(label, mask, *predictions).mean()
+        
         return loss
-        
+     
+    # def adjust_learning_rate(self, lr):
+    #     for param_group in self.optim.param_groups:
+    #         param_group['lr'] = lr
+           
     def step(self):  
-        pred, flows, warpeds = self.net(self.image0, self.image1)
-        
+        preds, flows, warpeds = self.net(self.image0, self.image1)
         # up_flow = Upsample(pred[-1], 4)
         # up_occ_mask = Upsample(flows[0], 4)
-        
-        loss = self.criterion(pred, self.label, self.mask)
+        self.label = self.label.flip(1)
+        loss = self.criterion(self.label, self.mask, preds)
         # pdb.set_trace()
         self.optim.zero_grad()
         loss.backward()
@@ -100,4 +106,4 @@ class MaskFlowNetModel(object):
             
     def eval(self):
         pass                 
-                
+                   
