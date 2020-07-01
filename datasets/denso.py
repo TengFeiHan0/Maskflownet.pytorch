@@ -10,7 +10,7 @@ from torchvision import transforms
 import matplotlib.pyplot as plt
 
 class DENSODataset(Dataset):
-    def __init__(self, denso_root, split_file, resize=None, samples = None):
+    def __init__(self, denso_root, split_file, resize=None, samples = None, config = None):
         self.denso_root = denso_root
         self.split_file = split_file
         self.resize = resize

@@ -12,18 +12,19 @@ VALIDATE_INDICES = dict()
 VALIDATE_INDICES['2012'] = [0, 12, 15, 16, 17, 18, 24, 30, 38, 39, 42, 50, 54, 59, 60, 61, 77, 78, 81, 89, 97, 101, 107, 121, 124, 142, 145, 146, 152, 154, 155, 158, 159, 160, 164, 182, 183, 184, 190]
 VALIDATE_INDICES['2015'] = [10, 11, 12, 25, 26, 30, 31, 40, 41, 42, 46, 52, 53, 72, 73, 74, 75, 76, 80, 81, 85, 86, 95, 96, 97, 98, 104, 116, 117, 120, 121, 126, 127, 153, 172, 175, 183, 184, 190, 199]
 
-from .build import build_transform_gen
-from . import transform as T 
+from datasets.transformation.build import build_transform_gen
+from datasets.transformation import transform_gen as T 
 
 class KITTIDataset(Dataset):
-    def __init__(self, kitti_root, split='train', editions='mixed', parts='mixed', crop=None, resize=None, samples = None):
+    def __init__(self, config, kitti_root, split='train', editions='mixed', parts='mixed', crop=None, resize=None, samples = None):
         self.kitti_root = kitti_root
         self.crop = crop
         self.resize = resize
         self.editions = editions
         self.split = split
         
-        self.tfm_gens = build_transform_gen()
+        is_train =True if self.split == 'train' else False
+        self.tfm_gens = build_transform_gen(config, is_train)
         kitti_2012_image = os.path.join(kitti_root, r'data_stereo_flow/training/colored_0')
         kitti_2012_flow_occ = os.path.join(kitti_root, r'data_stereo_flow/training/flow_occ')
         kitti_2015_image = os.path.join(kitti_root, r'data_scene_flow/training/image_2')
@@ -88,7 +89,8 @@ class KITTIDataset(Dataset):
             flow = np.flip(flow_occ[..., 1:3], axis=-1).astype(np.float32)
             flow = (flow - 32768.) / (64.)
             occ = flow_occ[..., 0:1].astype(np.uint8)
-
+            
+        self.resize = (896, 320)
         if self.resize is not None:
             img0 = cv2.resize(img0, self.resize)
             img1 = cv2.resize(img1, self.resize)
@@ -97,12 +99,11 @@ class KITTIDataset(Dataset):
                         np.array([flow.shape[d] for d in (1, 0)], dtype = np.float32) - 1.0))[np.newaxis, np.newaxis, :]
                 occ = cv2.resize(occ.astype(np.float32), self.resize)[..., np.newaxis]
                 flow = flow / (occ + (occ == 0))
-                # occ = (occ * 255).astype(np.uint8)
-        # elif self.split == 'train':
-        #     occ = occ * 255
+                occ = (occ * 255).astype(np.uint8)
+        
         img0 = T.apply_transform_gens(self.tfm_gens, img0)
         img1 = T.apply_transform_gens(self.tfm_gens, img1)
         img0 = torch.tensor(img0/255.).float()
         img1 = torch.tensor(img1/255.).float()
-
+       
         return img0, img1, flow, occ

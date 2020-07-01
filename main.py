@@ -11,8 +11,7 @@ from trainer import Trainer
 
 def main(args):
     with open(args.config) as f:
-        config = yaml.load(f)
-
+        config = yaml.load(f,  Loader=yaml.FullLoader)
     for k, v in config.items():
         setattr(args, k, v)
 
@@ -34,7 +33,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Pytorch MaskFlowNet.')
     parser.add_argument('--config', required=True, type=str)
-    parser.add_argument('--launcher', default='pytorch', type=str)
+    parser.add_argument('--launcher', default='', type=str)
     parser.add_argument('--load-iter', default=None, type=int)
     parser.add_argument('--load-pretrain', default=None, type=str)
     parser.add_argument('--resume', action='store_true')

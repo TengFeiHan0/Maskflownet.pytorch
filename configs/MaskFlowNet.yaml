@@ -1,39 +1,37 @@
 model:
-    class:
+    class: 'MaskFlownet_S'
     strides: [64, 32, 16, 8, 4]
     multiscale_weights: [.005, .01, .02, .08, .32] 
     total_iter: 450000
-    optim: 'Adam'
+    optim: 'SGD'
     lr_steps: []
     lr_mults: []
     lr: 0.0001
-    momentum: 
+    momentum: 0.9
     beta1:    
-    weight_decay:　    
+    weight_decay: 0.0001　    
     warmup_lr: []
     warmup_steps: []
-    
-
+    flow_multiplier: 1.
+    deform_bias: True
+    upfeat_ch: [16, 16, 16, 16]
 data:
     dataset: "kitti"
-    data_mean: [0.485, 0.456, 0.406]
-    data_std: [0.229, 0.224, 0.225]
-    base_aug:
-        flip: True
-        shift: [-0.2, 0.2]
-        scale: [0.8, 1.2]
-    #dilate: 0
-    load_rgb: True
-    batch_size: 16
+    train_path: "/home/fei/maskflownet/data/"
+    val_path: "/home/fei/maskflownet/data/"
+    split_file: ""
+    batch_size: 4
     batch_size_val: 32
     workers: 2
-
+    image_h: 320
+    image_w: 896
 trainer:
-    initial_val: True
+    initial_val: False
     val_freq: 2000
     val_iter: 10
     val_disp_start_iter: 0
     val_disp_end_iter: 1
     print_freq: 100
     save_freq: 10000
+    loss_record: ['loss']
     tensorboard: True

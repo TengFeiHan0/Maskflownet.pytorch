@@ -31,7 +31,6 @@ __all__ = [
     "RandomLighting",
     "RandomRotation",
     "Resize",
-    "ResizeShortestEdge",
     "TransformGen",
     "apply_transform_gens",
 ]

@@ -7,7 +7,7 @@ from torchvision import ops
 # ops.DeformConv2d()
 
 from .correlation_package.correlation import Correlation
-
+from .dcn.deform_conv import DeformConv, ModulatedDeformConv 
 
 def conv(in_planes, out_planes, kernel_size=3, stride=1, padding=1, dilation=1, activation=True):
     if activation:
@@ -33,8 +33,8 @@ def deconv(in_planes, out_planes, kernel_size=4, stride=2, padding=1):
     return nn.ConvTranspose2d(in_planes, out_planes, kernel_size, stride, padding, bias=True)
 
 
-def deformable_conv(in_planes, out_planes, kernel_size=3, strides=1, padding=1, use_bias=True):
-    return ops.DeformConv2d(in_planes, out_planes, kernel_size, strides, padding, bias=use_bias)
+def deformable_conv(in_planes, out_planes, kernel_size=3, strides=1, padding=1):
+    return DeformConv(in_planes, out_planes, kernel_size, strides, padding)
 
 
 def upsample_kernel2d(w, device):
@@ -55,7 +55,7 @@ def Upsample(img, factor):
         return img
     B, C, H, W = img.shape
     batch_img = img.view(B*C, 1, H, W)
-    batch_img = F.pad(batch_img, [0, 1, 0, 1], mode='replicate')
+    batch_img = F.pad(batch_img, (0, 1, 0, 1), mode='replicate')
     kernel = upsample_kernel2d(factor * 2 - 1, img.device)
     upsamp_img = F.conv_transpose2d(batch_img, kernel, stride=factor, padding=(factor-1))
     upsamp_img = upsamp_img[:, :, : -1, :-1]
@@ -87,12 +87,12 @@ class MaskFlownet_S(nn.Module):
         input: md --- maximum displacement (for correlation. default: 4), after warpping
         """
         super(MaskFlownet_S, self).__init__()
-        self.scale = 20. * config.network.flow_multiplier.get(1.)
+        self.scale = 20. * config.model['flow_multiplier']
         md = 4
         self.md = md
         self.strides = [64, 32, 16, 8, 4]
-        self.deform_bias = config.network.deform_bias.get(True)
-        self.upfeat_ch = config.network.upfeat_ch.get([16, 16, 16, 16])
+        self.deform_bias = config.model['deform_bias']
+        self.upfeat_ch = config.model['upfeat_ch']
 
         self.conv1a  = conv(3,   16, kernel_size=3, stride=2)
         self.conv1b = conv(16, 16, kernel_size=3, stride=1)
@@ -386,10 +386,9 @@ class MaskFlownet(nn.Module):
         super(MaskFlownet, self).__init__(**kwargs)
         self.strides = [64, 32, 16, 8, 4]
         self.md = 2
-        self.scale = 20. * config.network.flow_multiplier.get(1.)
-        self.deform_bias = config.network.deform_bias.get(True)
-        self.upfeat_ch = config.network.upfeat_ch.get([16, 16, 16, 16])
-
+        self.scale = 20. * config.model['flow_multiplier']
+        self.deform_bias = config.model['deform_bias']
+        self.upfeat_ch = config.model['upfeat_ch']
         self.MaskFlownet_S = MaskFlownet_S(config)
         self.activate = nn.LeakyReLU(0.1)
 
@@ -677,7 +676,7 @@ class EpeLossWithMask(nn.Module):
         if self.q is not None:
             loss = ((pred - label).abs().sum(1) + self.eps) ** self.q
         else:
-            loss = ((pred - label).pow(2).sum(1) + self.eps).sqrt()
+            loss = ((pred - label).pow(2).sum(1) + self.eps).sqrt()   
         loss = loss * mask.squeeze(1)
         loss = loss.view(loss.shape[0], -1).sum(1) / mask.view(mask.shape[0], -1).sum(1)
         return loss

@@ -9,17 +9,17 @@ import torch.distributed as dist
 import torchvision.utils as vutils
 from torch.utils.data import DataLoader
 
-import models
+from models import MaskFlowNetModel
 import utils
 import datasets
-#from dataset import ImageRawDataset, PartialCompEvalDataset, PartialCompDataset
-from datasets import KITTIDataset,DENSODataset
+
+from datasets import KITTIDataset, DENSODataset
 import pdb
 
 class Trainer(object):
 
     def __init__(self, args):
-
+        self.args = args
         # get rank
         self.world_size = dist.get_world_size()
         self.rank = dist.get_rank()
@@ -53,7 +53,9 @@ class Trainer(object):
                 self.logger = utils.create_logger(
                     'global_logger',
                     '{}/logs/log_train.txt'.format(args.exp_path))
-      
+        
+        #create model
+        self.model = MaskFlowNetModel(args)
         
         # optionally resume from a checkpoint
         assert not (args.load_iter is not None and args.load_pretrain is not None), \
@@ -81,9 +83,10 @@ class Trainer(object):
                 last_iter=self.start_iter - 1)
 
             if args.data['dataset'] == 'kitti':
-                train_dataset = KITTIDataset(args.data['root_folder'],split='train', editions='mixed', parts='mixed')
+                train_dataset = KITTIDataset(config =args, kitti_root=args.data['train_path'],split='train', editions='mixed', parts='mixed')
             elif args.data['dataset'] == 'denso':
-                train_dataset = DENSODataset(args.data['root_folder'], split_file=args.data['split_file'])   
+                train_dataset = DENSODataset(args.data['train_path'], split_file=args.data['split_file'], args = args)   
+            
             train_sampler = utils.DistributedGivenIterationSampler(
                 train_dataset,
                 args.model['total_iter'],
@@ -94,9 +97,10 @@ class Trainer(object):
                                            shuffle=False,
                                            num_workers=args.data['workers'],
                                            pin_memory=False,
-                                           sampler=train_sampler)
+                                           sampler = train_sampler
+                                           )
 
-        val_dataset = KITTIDataset(args.data['root_folder'], split='val', editions='mixed', parts='mixed')
+        val_dataset = KITTIDataset(config =args, kitti_root =args.data['val_path'], split='val', editions='mixed', parts='mixed')
         val_sampler = utils.DistributedSequentialSampler(val_dataset)
         self.val_loader = DataLoader(
             val_dataset,
@@ -104,9 +108,10 @@ class Trainer(object):
             shuffle=False,
             num_workers=args.data['workers'],
             pin_memory=False,
-            sampler=val_sampler)
+            sampler = val_sampler
+            )
 
-        self.args = args
+        
 
     def run(self):
 
@@ -206,35 +211,12 @@ class Trainer(object):
 
             dtime_rec.update(time.time() - end)
 
-            self.model.set_input(*inputs)
-            tensor_dict, loss_dict = self.model.forward_only()
+            
+            tensor_dict, loss_dict = self.model.forward_only(*inputs)
             for k in loss_dict.keys():
                 recorder[k].update(utils.reduce_tensors(loss_dict[k]).item())
             btime_rec.update(time.time() - end)
             end = time.time()
-
-            # tb visualize
-            if self.rank == 0:
-                disp_start = max(self.args.trainer['val_disp_start_iter'], 0)
-                disp_end = min(self.args.trainer['val_disp_end_iter'], len(self.val_loader))
-                if (i >= disp_start and i < disp_end):
-                    all_together.append(
-                        utils.visualize_tensor(tensor_dict,
-                        self.args.data.get('data_mean', [0,0,0]),
-                        self.args.data.get('data_std', [1,1,1])))
-                if (i == disp_end - 1 and disp_end > disp_start):
-                    all_together = torch.cat(all_together, dim=2)
-                    grid = vutils.make_grid(all_together,
-                                            nrow=1,
-                                            normalize=True,
-                                            range=(0, 255),
-                                            scale_each=False)
-                    if self.tb_logger is not None:
-                        self.tb_logger.add_image('Image_' + phase, grid,
-                                                 self.curr_step)
-                    cv2.imwrite("{}/images/{}_{}.png".format(
-                        self.args.exp_path, phase, self.curr_step),
-                        grid.permute(1, 2, 0).numpy())
 
         # logging
         if self.rank == 0:
